@@ -1024,6 +1024,7 @@ kvs_t *kvs_logkvs_create(blockdevice_t *bd) {
 
     update_bank_params(kvs);
     bank_state_t bank_state[KVSTORE_NUM_BANK];
+    uint16_t     bank_ver[KVSTORE_NUM_BANK] = {0, 0};
 
     size_t _size = (size_t)-1;
     for (uint8_t bank = 0; bank < KVSTORE_NUM_BANK; bank++) {
@@ -1044,8 +1045,7 @@ kvs_t *kvs_logkvs_create(blockdevice_t *bd) {
         }
 
         bank_state[bank] = KVSTORE_BANK_STATE_VALID;
-
-        context->active_bank = bank;
+        bank_ver[bank] = master_rec.version;
     }
     if ((bank_state[0] == KVSTORE_BANK_STATE_INVALID) &&
         (bank_state[1] == KVSTORE_BANK_STATE_INVALID)) {
@@ -1062,9 +1062,15 @@ kvs_t *kvs_logkvs_create(blockdevice_t *bd) {
         goto end;
     }
 
+    // 两个 bank 都合法 → 选 master record version 更高的
     if ((bank_state[0] == KVSTORE_BANK_STATE_VALID) &&
         (bank_state[1] == KVSTORE_BANK_STATE_VALID)) {
-        ;  //
+        context->active_bank = (bank_ver[0] >= bank_ver[1]) ? 0 : 1;
+        context->bank_version = bank_ver[context->active_bank];
+    } else if (bank_state[0] == KVSTORE_BANK_STATE_VALID) {
+        context->active_bank = 0;
+    } else {
+        context->active_bank = 1;
     }
 
     context->free_space_offset = _size;
